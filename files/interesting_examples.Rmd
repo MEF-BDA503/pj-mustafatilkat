@@ -1,0 +1,37 @@
+---
+title: "Interesting R Examples"
+author: "Mustafa Tilkat - BDA 503 - Fall 2017"
+---
+```{r,echo=FALSE,results="hide"}
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+```{r,echo=FALSE,eval=FALSE}
+rmarkdown::render("/Users/berkorbay/Dropbox/Courses_given/MEF_BDA_503_2017F/Guidelines/example_homework_1.Rmd",output_format="pdf_document")
+rmarkdown::render("/Users/berkorbay/Dropbox/Courses_given/MEF_BDA_503_2017F/Guidelines/example_homework_1.Rmd",output_format="html_document")
+```
+
+1. [An Introduction to XGBoost R package](http://dmlc.ml/rstats/2016/03/10/xgboost.html)
+
+    The GBM (boosted trees) has been around for really a while, and there are a lot of materials on the topic. This tutorial tries to explain boosted trees in a self-contained and principled way using the elements of supervised learning. We think this explanation is cleaner, more formal, and motivates the variant used in xgboost.
+    
+2. [How to create animated GIF images for data visualization using gganimate (in R)?](https://www.analyticsvidhya.com/blog/2017/06/a-study-on-global-seismic-activity-between-1965-and-2016/)
+
+    This article will tell one of the ways to do so using animated GIF images (Graphics Interchangeable format). This would be particularly helpful when you want to show time / flow based stories. 
+
+3. [BallR: Interactive NBA Shot Charts with R and Shiny](http://toddwschneider.com/posts/ballr-interactive-nba-shot-charts-with-r-and-shiny/)
+
+    This example is about building a tool called BallR, using R Shiny framework, to explore NBA shot data at the player-level. It calculates aggregate statistics like field goal percentage and points per shot attempt, and compares the selected player to league averages at different areas of the court.
+
+
+4. [Practical guide to implement machine learning with CARET package in R](https://www.analyticsvidhya.com/blog/2016/12/practical-guide-to-implement-machine-learning-with-caret-package-in-r-with-practice-problem/)
+
+    This post is about Caret package for solve almost any supervised machine learning problem. It provides a uniform interface to several machine learning algorithms and standardizes various other tasks such as Data splitting, Pre-processing, Feature selection, Variable importance estimation, etc.
+
+
+5. [Intro to The data.table Package](https://www.r-bloggers.com/intro-to-the-data-table-package/)
+
+    Its a helpful document to understand data.table package that provides working with large data sets, also can behave just like a data frame. Data.table package offers fast subset, grouping,  update,  and joins.
+
+
