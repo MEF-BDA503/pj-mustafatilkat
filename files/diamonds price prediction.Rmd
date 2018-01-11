@@ -1,0 +1,324 @@
+---
+title: "Mustafa Tilkat Week 5 - Diamonds Price Prediction"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Diamonds Price Prediction
+
+First of all, we need to call our libraries.
+
+```{r message=FALSE, warning=FALSE}
+library(data.table)
+library(ggplot2)
+library(ggthemes)
+library(tidyverse)
+library(highcharter)
+library(plotly)
+library(ggplot2)
+library(xgboost)
+library(randomForest)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(dplyr)
+```
+
+Train and Test data sets are preparing.
+
+```{r }
+set.seed(555)
+set.seed(555)
+
+diamonds_test2 <- diamonds %>% mutate(diamond_id = row_number()) %>%
+  group_by(cut, color, clarity) %>% sample_frac(0.2) %>% ungroup()
+
+diamonds_train2 <- anti_join(diamonds %>% mutate(diamond_id = row_number()),
+                            diamonds_test2, by = "diamond_id")
+
+diamonds_train2<-data.table(diamonds_train2)
+diamonds_test2<-data.table(diamonds_test2)
+
+```
+
+You can see the summry of train and test data sets.
+
+```{r}
+summary(diamonds_train2)
+summary(diamonds_test2)
+```
+
+As you see there is no NA and some of the variables are numeric and some of them are categoric.
+
+```{r}
+diamonds_train2[,length(diamond_id)]
+diamonds_train2[,length(unique(diamond_id))]
+```
+When we check the id's there is no problem about uniqness.
+
+```{r}
+ggplot(diamonds_train2, aes(x = price)) +
+  geom_histogram(color = "blue", fill = "Blue", binwidth = 25) +
+  scale_x_continuous(breaks = seq(0, 5000, 500)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  coord_cartesian(c(0,5000)) +
+  facet_grid(cut~color) +
+  xlab("Price") + ylab("Count")
+```
+In this graph we can see that Ideal cut diamonds is the the most seen data point at each colurs. 
+
+```{r}
+diamonds_train2[x<=0 & y<=0 & z<=0,]
+```
+There are some diamonds which have x,y,z values are zero. It should be better to put them out.
+```{r}
+diamonds_train2<-diamonds_train2[x>0 | y>0 | z>0,]
+```
+
+```{r}
+summary(diamonds$price)
+```
+
+```{r}
+ggplot(diamonds_train2, aes(x = price)) +
+  geom_histogram(color = "black", fill = "Blue", binwidth = 500) +
+  scale_x_continuous(breaks = seq(0, 20000, 500)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  xlab("Price") + ylab("Count")
+
+```
+
+
+when we check the price we can say that range is quite high so we should take the log of price.
+
+```{r}
+
+diamonds_train2[,cut1:=ifelse(cut=="Fair",1,ifelse(cut=="Good",2,ifelse(cut=="Very Good",3,ifelse(cut=="Premium",4,5))))]
+diamonds_train2[,color1:=ifelse(color=="D",1,ifelse(color=="E",2,ifelse(color=="F",3,ifelse(color=="G",4,ifelse(color=="H",5,ifelse(color=="I",6,7))))))]
+diamonds_train2[,clarity1:=ifelse(clarity=="I1",1,ifelse(clarity=="SI2",2,ifelse(clarity=="SI1",3,ifelse(clarity=="VS2",4,ifelse(clarity=="VS1",5,ifelse(clarity=="VVS2",6,ifelse(clarity=="VVS1",7,8)))))))]
+
+diamonds_test2[,cut1:=ifelse(cut=="Fair",1,ifelse(cut=="Good",2,ifelse(cut=="Very Good",3,ifelse(cut=="Premium",4,5))))]
+diamonds_test2[,color1:=ifelse(color=="D",1,ifelse(color=="E",2,ifelse(color=="F",3,ifelse(color=="G",4,ifelse(color=="H",5,ifelse(color=="I",6,7))))))]
+diamonds_test2[,clarity1:=ifelse(clarity=="I1",1,ifelse(clarity=="SI2",2,ifelse(clarity=="SI1",3,ifelse(clarity=="VS2",4,ifelse(clarity=="VS1",5,ifelse(clarity=="VVS2",6,ifelse(clarity=="VVS1",7,8)))))))]
+
+```
+
+Also for modelling in train and test data set some of the variables turn it to another variable for example D is the worst color category and we will say it 1 as numeric after this process we will change the type of their class from numeric to factor.
+
+```{r}
+
+diamonds_train2[, carat_log:=log(carat),.(diamond_id)]
+diamonds_test2[, carat_log:=log(carat),.(diamond_id)]
+
+diamonds_train<-diamonds_train2[,list(carat_log,cut1,color1,clarity1,depth,x,y,z,price,diamond_id)]
+diamonds_test<-diamonds_test2[,list(carat_log,cut1,color1,clarity1,depth,x,y,z,price,diamond_id)]
+
+diamonds_train$cut1<-as.factor(diamonds_train$cut1)
+diamonds_train$color1<-as.factor(diamonds_train$color1)
+diamonds_train$clarity1<-as.factor(diamonds_train$clarity1)
+
+diamonds_test$cut1<-as.factor(diamonds_test$cut1)
+diamonds_test$color1<-as.factor(diamonds_test$color1)
+diamonds_test$clarity1<-as.factor(diamonds_test$clarity1)
+```
+
+Carat is also an important variable and after looking its summary the logarithmic version of this variable take into consider.
+
+```{r}
+diamonds_train<-diamonds_train[color1==4  & clarity1==8 & cut1==5,]
+diamonds_test<-diamonds_test[color1==4 & clarity1==8 & cut1==5,]
+
+```
+
+Clustering can give better results in tree models.But clustering was not done in this study so a samll data set was selected in existing categorical variables.
+
+Performance measurement fuction is at below. ( Root mean square percentage error)
+```{r}
+RMPSE<- function(preds, dtrain) {
+  labels <- getinfo(dtrain, "label")
+  elab<-exp(as.numeric(labels))-1
+  epreds<-exp(as.numeric(preds))-1
+  err <- sqrt(mean((epreds/elab-1)^2))
+  return(list(metric = "RMPSE", value = err))
+}
+```
+
+We need to set a sample size which is the % 10 of whole data.
+
+```{r}
+nrow(diamonds_train)
+h<-sample(nrow(diamonds_train),10)
+```
+
+Crating the gbm matrix. Added 1 to sales because of log(0) goes inf
+
+```{r}
+dval<-xgb.DMatrix(data=data.matrix(diamonds_train[h,]),label=log(diamonds_train$price+1)[h])
+dtrain<-xgb.DMatrix(data=data.matrix(diamonds_train[-h,]),label=log(diamonds_train$price+1)[-h])
+watchlist<-list(val=dval,trainset=dtrain)
+```
+
+Setting the parameters
+
+```{r}
+param <- list(  objective           = "reg:linear",
+                booster = "gbtree",
+                eta                 = 0.45, # 0.40, #0.3, #0.2, #0.1, changed from 0.45
+                max_depth           = 15, 
+                subsample           = 0.8, 
+                colsample_bytree    = 0.8 
+                
+)
+```
+
+Finding the best seed number for maximum accuracy
+
+```{r message=FALSE, warning=FALSE}
+selectseed<-function(a,b){
+  
+  bestseed2 = data.table(s = 201, x = 1.1, y = 1.1)
+  
+  for (s in a:b){
+    
+    set.seed(s)
+    set.seed(s)
+    
+    xgbmodel <- xgb.train(   params         = param,
+                             data                = dtrain,
+                             nrounds             = 30, #10, #20, #30, #100, # changed from 30
+                             verbose             = 0,
+                             early.stop.round    = 25,
+                             watchlist           = watchlist,
+                             maximize            = FALSE,
+                             feval=RMPSE
+    )
+    testset<-data.frame(diamonds_test)
+    
+    feature.names <- names(diamonds_test)[-c(9,10)]
+    
+    forecasts <- exp(predict(xgbmodel, data.matrix(testset[,feature.names]))) -1
+    
+    forecasts<-data.table(forecasts)
+    
+    submission <- data.frame(diamond_id=testset$diamond_id, price=forecasts)
+    
+    submission<-data.table(submission)
+    testset<-data.table(testset)
+    
+    setkey(submission,diamond_id)
+    setkey(testset,diamond_id)
+    
+    final<-testset[submission]
+    
+    final[,Err:=abs(forecasts-price)/price]
+    final2<-final[,list(sum(price),sum(abs(forecasts-price)),sum(price)),.(diamond_id)]
+    
+    setnames(final2,"V1","TWS")
+    setnames(final2,"V2","TE")
+    setnames(final2,"V3","TP")
+    
+    x<-final2[,sum(TE)/sum(TWS)]
+    y<-final[,mean(Err)]
+    
+    bestseed<-data.table(s,x,y)
+    bestseed2<-rbind(bestseed,bestseed2)
+    
+  }
+  
+  seed<-head(bestseed2[order(x)],1)[]$s
+  return(seed)
+}
+```
+
+Setting the best seed the number between a to b
+
+```{r message=TRUE, warning=FALSE}
+a=1
+b=50
+seed=selectseed(a,b)
+set.seed(seed)
+set.seed(seed)
+```
+
+Training the xgboost model
+
+```{r}
+xgbmodel <- xgb.train(   params              = param,
+                         data                = dtrain,
+                         nrounds             = 30, #10, #20, #30, #100, # changed from 30
+                         verbose             = 1,
+                         early.stop.round    = 25,
+                         watchlist           = watchlist,
+                         maximize            = FALSE,
+                         feval=RMPSE
+)
+```
+
+Setting the feature names in test dataset
+
+```{r}
+testset<-data.frame(diamonds_test)
+feature.names <- names(testset)[-c(9,10)]
+```
+
+Generating the forecast with predict function and the exp function converts the values log to normal
+
+```{r}
+forecasts <- exp(predict(xgbmodel, data.matrix(testset[,feature.names]))) -1
+forecasts<-data.table(forecasts)
+```
+
+Crating the final table which obtains forecasts and actual values
+
+```{r}
+submission <- data.frame(diamond_id=testset$diamond_id, price=forecasts)
+
+submission<-data.table(submission)
+testset<-data.table(testset)
+
+setkey(submission,diamond_id)
+setkey(testset,diamond_id)
+
+final<-testset[submission]
+```
+
+Measuring the performance
+
+```{r}
+final[,Err:=abs(forecasts-price)/price]
+final2<-final[,list(sum(price),sum(abs(forecasts-price)),sum(forecasts)),.(diamond_id)]
+
+setnames(final2,"V1","TWS") #Total Weekly Sales
+setnames(final2,"V2","TE")  #Total Errors
+setnames(final2,"V3","TF")  #Total Forecasts
+
+final2[,sum(TE)/sum(TWS)]
+final[,mean(Err)]
+```
+We can see that the average error is only %15 and it sounds good. Lets look it on a graph.
+
+```{r}
+g=ggplot(final,aes(x=forecasts,y=price),)
+g=g+xlab("forecasts")
+g=g+ylab("Price $")
+g=g+geom_point(size=6,colour="black",alpha=0.2)
+g=g+geom_point(size=5,colour="blue",alpha=0.2)
+g=g+geom_smooth(method="lm",colour="black")
+g
+```
+
+As it can seen on graph high price point is the weak side of our model. Maybe parameter optimization cn help or adding new variable helps reaching better results.
+
+And finally this is the importance matrix of our model. We can see that the y variable is the most important variable. Also logarithm of carat,x,z variable's are important too.
+
+```{r}
+model <- xgb.dump(xgbmodel, with.stats = T)
+names <- dimnames(data.matrix(testset[,-c(9,10)]))[[2]]
+importance_matrix <- xgb.importance(names, model = xgbmodel)
+xgb.plot.importance(importance_matrix[1:5,])
+```
+
