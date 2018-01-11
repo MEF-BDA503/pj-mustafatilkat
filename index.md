@@ -3,6 +3,10 @@
 
 + [Here](files/Anadata.Rdata) is my data set form YOK web site used in my final exam.
 
+## Week 5 (Jan 10)
+
++ [Here](files/diamonds_price_prediction) is my diamond data set analysis and price prediction with xgboost model.
+
 ## Week 3 (Oct 24)
 
 + The data set I am propose to use in my project is the HR data set. [Here](files/homework_2.html) is the data and my initial exploratory data analysis on it.
