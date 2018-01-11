@@ -69,6 +69,7 @@ ggplot(diamonds_train2, aes(x = price)) +
   facet_grid(cut~color) +
   xlab("Price") + ylab("Count")
 ```
+
 In this graph we can see that Ideal cut diamonds is the the most seen data point at each colurs. 
 
 ```{r}
